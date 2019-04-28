@@ -39,13 +39,12 @@ func RemoveIndex(s []string, index int) []string {
 
 type Speaker struct {
 	folder string
-	Q_tmps []string
-	mp3s   map[string][]byte
-	sync.RWMutex
+	mp3s   sync.Map
 }
 
 var instance *Speaker
 var once sync.Once
+var ch chan []byte
 
 func hash(s string) string {
 	h := fnv.New64a()
@@ -60,8 +59,6 @@ func GetInstance() *Speaker {
 		}
 		instance = &Speaker{
 			folder: path + "/audio/",
-			Q_tmps: []string{},
-			mp3s:   make(map[string][]byte),
 		}
 		instance.loadFiles()
 	})
@@ -80,31 +77,17 @@ func (s *Speaker) loadFiles() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			s.mp3s[name] = data
+			s.mp3s.Store(name, data)
 		}
 	}
 }
 
-func (s *Speaker) readMap(key string) ([]byte, bool) {
-    s.RLock()
-    value, ok:= s.mp3s[key]
-	s.RUnlock()
-	if ok {
-		return value, true
-	}
-	return nil, false
-}
-
-func (s *Speaker) writeMap(key string, value []byte) {
-    s.Lock()
-    s.mp3s[key] = value
-    s.Unlock()
-}
 func (s *Speaker) waitFile(name string) []byte {
-	mp3, ok := s.readMap(name)
+	mp3, ok := s.mp3s.Load(name)
 	if ok {
 		fmt.Println("got a mp3 when downloaded.")
-		return mp3
+		tmp, _ := mp3.([]byte)
+		return tmp
 	}
 	return s.waitFile(name)
 }
@@ -112,51 +95,39 @@ func (s *Speaker) Speak(text string) []byte {
 	fmt.Printf("%d", os.Getpid())
 	name := hash(text[1:])
 	name = name + ".mp3"
-	if len(s.mp3s) != 0 {
-		mp3, ok := s.readMap(name)
-		if ok {
+	tmp, ok := s.mp3s.Load(name)
+	if ok {
+		mp3, ok1 := tmp.([]byte)
+		if ok1 {
 			fmt.Println("have a mp3.")
 			return mp3
+		} else {
+			fmt.Println("wait a mp3.")
+			return s.waitFile(name)
 		}
 	}
+	s.mp3s.Store(name, "wait")
 	var mp3 []byte
-	Qok, _ := in_array(name, s.Q_tmps)
-	if Qok {
-		fmt.Println("wait a mp3.")
-		return s.waitFile(name)
-	} else {
-		fmt.Println("download a mp3.")
-		s.Q_tmps = append(s.Q_tmps, name)
-		url := fmt.Sprintf("http://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&textlen=32&client=tw-ob&q=%s&tl=%s", url.QueryEscape(text), "en")
-		response, err := http.Get(url)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer response.Body.Close()
-		mp3, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		s.writeMap(name, mp3)
-		Qok, index := in_array(name, s.Q_tmps)
-		if Qok {
-			s.Q_tmps = RemoveIndex(s.Q_tmps, index)
-		}
-		output, err := os.Create(s.folder + name)
-		if err != nil {
-			log.Fatal(err)
-		}
-		_, err = output.Write(mp3)
-		defer output.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-		mp3, ok := s.readMap(name)
-		if ok {
-			fmt.Println("downloaded a mp3.")
-			return s.mp3s[name]
-		}
-		return mp3
+	fmt.Println("download a mp3.")
+	url := fmt.Sprintf("http://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&textlen=32&client=tw-ob&q=%s&tl=%s", url.QueryEscape(text), "en")
+	response, err := http.Get(url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer response.Body.Close()
+	mp3, err = ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	s.mp3s.Store(name, mp3)
+	output, err := os.Create(s.folder + name)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = output.Write(mp3)
+	defer output.Close()
+	if err != nil {
+		log.Fatal(err)
 	}
 	return mp3
 }
