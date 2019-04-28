@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"strconv"
 	"sync"
 )
@@ -19,7 +20,6 @@ type Speaker struct {
 
 var instance *Speaker
 var once sync.Once
-var ch chan []byte
 
 func hash(s string) string {
 	h := fnv.New64a()
@@ -59,13 +59,17 @@ func (s *Speaker) loadFiles() {
 func (s *Speaker) waitFile(name string) []byte {
 	mp3, ok := s.mp3s.Load(name)
 	if ok {
-		fmt.Println("got a mp3 when downloaded.")
-		tmp, _ := mp3.([]byte)
-		return tmp
+		tmp, ok := mp3.([]byte)
+		if ok {
+			fmt.Println("got a mp3 when downloaded.")
+			fmt.Println(reflect.TypeOf(tmp).String())
+			return tmp
+		}
 	}
 	return s.waitFile(name)
 }
 func (s *Speaker) Speak(text string) []byte {
+	F()
 	fmt.Printf("%d", os.Getpid())
 	name := hash(text[1:])
 	name = name + ".mp3"
@@ -74,6 +78,7 @@ func (s *Speaker) Speak(text string) []byte {
 		mp3, ok1 := tmp.([]byte)
 		if ok1 {
 			fmt.Println("have a mp3.")
+			fmt.Println(reflect.TypeOf(tmp).String())
 			return mp3
 		} else {
 			fmt.Println("wait a mp3.")
@@ -103,5 +108,6 @@ func (s *Speaker) Speak(text string) []byte {
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println(reflect.TypeOf(mp3).String())
 	return mp3
 }
