@@ -69,7 +69,6 @@ func (s *Speaker) waitFile(name string) []byte {
 	return s.waitFile(name)
 }
 func (s *Speaker) Speak(text string) []byte {
-	F()
 	fmt.Printf("%d", os.Getpid())
 	name := hash(text[1:])
 	name = name + ".mp3"
