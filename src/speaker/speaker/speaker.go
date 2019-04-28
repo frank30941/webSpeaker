@@ -1,7 +1,5 @@
 package speaker
 
-//package main
-
 import (
 	"fmt"
 	"hash/fnv"
@@ -10,32 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"reflect"
 	"strconv"
 	"sync"
 )
-
-func in_array(val interface{}, array interface{}) (exists bool, index int) {
-	exists = false
-	index = -1
-
-	switch reflect.TypeOf(array).Kind() {
-	case reflect.Slice:
-		s := reflect.ValueOf(array)
-
-		for i := 0; i < s.Len(); i++ {
-			if reflect.DeepEqual(val, s.Index(i).Interface()) == true {
-				index = i
-				exists = true
-				return
-			}
-		}
-	}
-	return
-}
-func RemoveIndex(s []string, index int) []string {
-	return append(s[:index], s[index+1:]...)
-}
 
 type Speaker struct {
 	folder string
@@ -81,7 +56,6 @@ func (s *Speaker) loadFiles() {
 		}
 	}
 }
-
 func (s *Speaker) waitFile(name string) []byte {
 	mp3, ok := s.mp3s.Load(name)
 	if ok {
@@ -131,8 +105,3 @@ func (s *Speaker) Speak(text string) []byte {
 	}
 	return mp3
 }
-
-/*func main() {
-	speaker := GetInstance()
-	speaker.Speak("The body of Savannahr.")
-}*/

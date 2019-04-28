@@ -16,7 +16,5 @@ func main() {
 }
 func handler(w http.ResponseWriter, r *http.Request) {
 	tmp := speaker.GetInstance()
-	//io.Copy(w, tmp.Speak(r.URL.Path))
-
 	w.Write(tmp.Speak(r.URL.Path))
 }
