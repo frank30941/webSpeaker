@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"reflect"
 	"strconv"
 	"sync"
 )
@@ -52,48 +51,48 @@ func (s *Speaker) loadFiles() {
 			if err != nil {
 				log.Fatal(err)
 			}
+			fmt.Println(name)
 			s.mp3s.Store(name, data)
 		}
 	}
 }
-func (s *Speaker) waitFile(name string) []byte {
-	mp3, ok := s.mp3s.Load(name)
-	if ok {
-		tmp, ok := mp3.([]byte)
-		if ok {
-			fmt.Println("got a mp3 when downloaded.")
-			fmt.Println(reflect.TypeOf(tmp).String())
-			return tmp
-		}
-	}
-	return s.waitFile(name)
-}
 func (s *Speaker) Speak(text string) []byte {
-	fmt.Printf("%d", os.Getpid())
 	name := hash(text[1:])
 	name = name + ".mp3"
 	tmp, ok := s.mp3s.Load(name)
 	if ok {
 		mp3, ok1 := tmp.([]byte)
 		if ok1 {
-			fmt.Println("have a mp3.")
-			fmt.Println(reflect.TypeOf(tmp).String())
+			//fmt.Println("have a mp3.")
+			//fmt.Println(reflect.TypeOf(tmp).String())
 			return mp3
-		} else {
-			fmt.Println("wait a mp3.")
-			return s.waitFile(name)
 		}
+		mp3 = nil
+		tmp = nil
+		//fmt.Println("wait a mp3.")
+		for {
+			mp3, ok := s.mp3s.Load(name)
+			if ok {
+				tmp, ok := mp3.([]byte)
+				if ok {
+					mp3 = tmp
+					tmp = nil
+					break
+				}
+			}
+		}
+		return mp3
+
 	}
+	tmp = nil
 	s.mp3s.Store(name, "wait")
-	var mp3 []byte
 	fmt.Println("download a mp3.")
 	url := fmt.Sprintf("http://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&textlen=32&client=tw-ob&q=%s&tl=%s", url.QueryEscape(text), "en")
 	response, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer response.Body.Close()
-	mp3, err = ioutil.ReadAll(response.Body)
+	mp3, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -103,10 +102,12 @@ func (s *Speaker) Speak(text string) []byte {
 		log.Fatal(err)
 	}
 	_, err = output.Write(mp3)
-	defer output.Close()
+	output = nil
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(reflect.TypeOf(mp3).String())
+	response.Body.Close()
+	output.Close()
+	//fmt.Println(reflect.TypeOf(mp3).String())
 	return mp3
 }
